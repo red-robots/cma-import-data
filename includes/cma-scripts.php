@@ -32,9 +32,83 @@ function cma_admin_menu_option()
 }
 
 
+/* Add Properties Custom Post. This function can add multiple custom posts if needed. */
+add_action('init', 'cma_cpt_init', 1);
+function cma_cpt_init() {
+    $post_types = array(
+        array(
+            'post_type' => 'properties',
+            'menu_name' => 'Properties',
+            'plural'    => 'Properties',
+            'single'    => 'Property',
+            'menu_icon' => 'dashicons-admin-multisite',
+            'supports'  => array('title','editor','thumbnail')
+        )
+    );
+    
+    if($post_types) {
+        foreach ($post_types as $p) {
+            $p_type = ( isset($p['post_type']) && $p['post_type'] ) ? $p['post_type'] : ""; 
+            $single_name = ( isset($p['single']) && $p['single'] ) ? $p['single'] : "Custom Post"; 
+            $plural_name = ( isset($p['plural']) && $p['plural'] ) ? $p['plural'] : "Custom Post"; 
+            $menu_name = ( isset($p['menu_name']) && $p['menu_name'] ) ? $p['menu_name'] : $p['plural']; 
+            $menu_icon = ( isset($p['menu_icon']) && $p['menu_icon'] ) ? $p['menu_icon'] : "dashicons-admin-post"; 
+            $supports = ( isset($p['supports']) && $p['supports'] ) ? $p['supports'] : array('title','editor','custom-fields','thumbnail'); 
+            $taxonomies = ( isset($p['taxonomies']) && $p['taxonomies'] ) ? $p['taxonomies'] : array(); 
+            $parent_item_colon = ( isset($p['parent_item_colon']) && $p['parent_item_colon'] ) ? $p['parent_item_colon'] : ""; 
+            $menu_position = ( isset($p['menu_position']) && $p['menu_position'] ) ? $p['menu_position'] : 20; 
+            
+            if($p_type) {
+                
+                $labels = array(
+                    'name' => _x($plural_name, 'post type general name'),
+                    'singular_name' => _x($single_name, 'post type singular name'),
+                    'add_new' => _x('Add New', $single_name),
+                    'add_new_item' => __('Add New ' . $single_name),
+                    'edit_item' => __('Edit ' . $single_name),
+                    'new_item' => __('New ' . $single_name),
+                    'view_item' => __('View ' . $single_name),
+                    'search_items' => __('Search ' . $plural_name),
+                    'not_found' =>  __('No ' . $plural_name . ' found'),
+                    'not_found_in_trash' => __('No ' . $plural_name . ' found in Trash'), 
+                    'parent_item_colon' => $parent_item_colon,
+                    'menu_name' => $menu_name
+                );
+            
+            
+                $args = array(
+                    'labels' => $labels,
+                    'public' => true,
+                    'publicly_queryable' => true,
+                    'show_ui' => true, 
+                    'show_in_menu' => true, 
+                    'show_in_rest' => true,
+                    'query_var' => true,
+                    'rewrite' => true,
+                    'capability_type' => 'post',
+                    'has_archive' => false, 
+                    'hierarchical' => false, // 'false' acts like posts 'true' acts like pages
+                    'menu_position' => $menu_position,
+                    'menu_icon'=> $menu_icon,
+                    'supports' => $supports
+                ); 
+                
+                register_post_type($p_type,$args); // name used in query
+                
+            }
+            
+        }
+    }
+}
+
+
 function cma_search_import_data()
 {
     $message = '';
+    $isError = false;
+    $isImported = false;
+    $totalItems = 0;
+    $itemsImported = array();
 
     if( array_key_exists( 'cma_search_submit_values', $_POST) ){
 
@@ -71,10 +145,18 @@ function cma_search_import_data()
                             cma_update_post_meta( $post_id, 'manager_name', $value[2] );
                             cma_update_post_meta( $post_id, 'manager_email', $value[4] );
                             cma_update_post_meta( $post_id, 'manager_phone', $value[5] );
+                            $itemsImported[] = $post_id;
                         }
                     } // coupon code does not exists
 
-                    $message = 'CSV file successfully imported.';
+                    $isImported = true;
+                    $totalItems = ($itemsImported) ? count($itemsImported) : 0;
+                    $tmsg = ($totalItems>1) ? ' items':' item';
+                    $message = 'CSV file successfully imported. ' . '(' . $totalItems . $tmsg. ')';
+                    if($totalItems==0) {
+                        $message = 'Item(s) imported already exists!';
+                        $isError = TRUE;
+                    }
                     
                 } // foreach
 
@@ -82,26 +164,80 @@ function cma_search_import_data()
             
         }  else {
             $message = 'Please upload a valid CSV file.';
+            $isError = TRUE;
         }  // File not empty
         
     }
 
     ?>
         <div class="wrap">
+            <?php if ( isset($_GET['downloadjson']) && $_GET['downloadjson'] ) { forceDownLoad(plugins_url('cma-import-data').'/acf.json'); } ?>
+
             <h2>CMA Search Form</h2>
-            <p>This plugin will display the search form for CMA.</p>
-            <code>
-                [cma-search-form]
-            </code>
-           <p>&nbsp;</p>
 
-            <hr>
-
-            <?php if( $message ): ?>
-                <div class="updated_settings_error notice is-dismissable"><strong><?php echo $message; ?></strong></div>
+            <?php 
+            $stat = ($isError) ? 'error':'updated';
+            if( $message ): ?>
+                <div id="message" class="<?php echo $stat; ?> settings-error notice is-dismissible"><p><strong><?php echo $message; ?></strong></p> <button type="button" class="notice-dismiss"><span class="screen-reader-text">Dismiss this notice.</span></button></div>
             <?php endif; ?>
 
-            <?php include('import-form.php'); ?>
+            <p>Use this shortcode to display the search form for CMA.</p>
+            <code>[cma-search-form]</code>
+            <hr>
+
+        
+            <?php  
+                // if( isset($_REQUEST['_wp_http_referer']) && $_REQUEST['_wp_http_referer'] ) {
+                //     wp_redirect( $_REQUEST['_wp_http_referer'] );
+                //     //exit;
+                // }
+            ?>
+
+            <h2>CMA Import Properties Data</h2>
+            <p>Import CSV file to populate the CMA custom post type <u>properties</u></p>
+            <p><a href="<?php echo get_admin_url(); ?>admin.php?page=cma-search-data&downloadjson=1">Download this json file</a> and import it to ACF plugin.</p>
+            <p style="margin:0 0 0"><strong>Custom Field Names:</strong></p>
+            <ul id="acffields">
+                <li>coupon_code</li>
+                <li>community_name</li>
+                <li>address</li>
+                <li>manager_name</li>
+                <li>manager_email</li>
+                <li>manager_phone</li>
+            </ul>
+            
+            <?php 
+            include('import-form.php'); 
+            //include('admin-results.php'); 
+            ?>
+            <?php if($isImported && $totalItems>0) { ?>
+            <table class="wp-list-table widefat fixed striped cma-search">
+                <thead>
+                    <tr>
+                        <th class="manage-column column-columnname" scope="col">coupon_code</th>
+                        <th class="manage-column column-columnname" scope="col">community_name</th>
+                        <th class="manage-column column-columnname" scope="col">address</th>
+                        <th class="manage-column column-columnname" scope="col">manager_name</th>
+                        <th class="manage-column column-columnname" scope="col">manager_email</th>
+                        <th class="manage-column column-columnname" scope="col">manager_phone</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php 
+                    foreach ($itemsImported as $postId) { ?>
+                    <tr>
+                        <td><?php echo get_field("coupon_code",$postId); ?></td>
+                        <td><?php echo get_the_title($postId); ?></td>
+                        <td><?php echo get_field("address",$postId); ?></td>
+                        <td><?php echo get_field("manager_name",$postId); ?></td>
+                        <td><?php echo get_field("manager_email",$postId); ?></td>
+                        <td><?php echo get_field("manager_phone",$postId); ?></td>
+                    </tr>
+                    <?php } ?>
+                </tbody>
+            </table>
+            <?php } ?>
+            
         </div>
 
     <?php
@@ -157,6 +293,22 @@ function check_code_exists( $coupon_code )
 }
 
 
+function forceDownLoad($filename)
+{
+
+    header("Pragma: public");
+    header("Expires: 0"); // set expiration time
+    header("Cache-Control: must-revalidate, post-check=0, pre-check=0");
+    header("Content-Type: application/force-download");
+    header("Content-Type: application/octet-stream");
+    header("Content-Type: application/download");
+    header("Content-Disposition: attachment; filename=".basename($filename).";");
+    header("Content-Transfer-Encoding: binary");
+    header("Content-Length: ".filesize($filename));
+    
+    @readfile($filename);
+    exit(0);
+}
 
 
 function activate(){ 

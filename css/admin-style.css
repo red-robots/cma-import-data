@@ -5,3 +5,12 @@
 .widefat thead tr th{
     font-weight: bold;
 }
+
+ul#acffields {
+    list-style: square;
+    margin: 0 0 20px 30px;
+}
+ul#acffields li {
+    margin: 0 0;
+    padding: 0 0;
+}
