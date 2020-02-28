@@ -1,0 +1,7 @@
+.widefat th.column-columnname{
+    font-weight: bold;
+}
+
+.widefat thead tr th{
+    font-weight: bold;
+}
