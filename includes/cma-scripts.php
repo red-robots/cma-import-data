@@ -324,3 +324,36 @@ register_activation_hook( __FILE__, 'activate' );
 
 register_deactivation_hook( __FILE__, 'deactivate' );
 
+
+add_filter( 'page_template', 'wpa_search_page_template' );
+function wpa_search_page_template( $page_template )
+{
+    if ( is_page( 'search' ) ) {
+        $page_template = dirname( __FILE__ ) . '/search.php';
+    }
+    return $page_template;
+}
+
+
+function wp_cma_pagination( $custom_query ) {
+    //global $wp_query;
+        $big = 999999999; // need an unlikely integer
+            echo paginate_links( array(
+                'base'                  => '%_%',
+                'format'                => '?paged=%#%',
+                'current'               => max( 1, get_query_var('paged') ),
+                'total'                 => $custom_query->max_num_pages,                
+                'prev_next'             => true,
+                'prev_text'             => __('« Previous'),
+                'next_text'             => __('Next »'),
+                'type'                  => 'plain',
+                
+        ) );
+}
+
+
+function wpa66273_disable_canonical_redirect( $query ) {
+    if( 'search' == $query->query_vars['pagename'] )
+        remove_filter( 'template_redirect', 'redirect_canonical' );
+}
+add_action( 'parse_query', 'wpa66273_disable_canonical_redirect' );
